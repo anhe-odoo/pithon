@@ -1,0 +1,122 @@
+/** \file   macroDef.mac
+ *  \brief  Implementation des macros utilisees dans les autres fichiers                            */
+
+#include "numbered.mac"
+
+#define o <<dot()>>
+#define x <<cross()>>
+
+// MACRO-DEFINITION PERMETTANT DE CONCATENER DEUX COMMANDES ========================================
+#if !defined( conct )
+#   define conct(STR1, STR2) STR1 ## STR2
+#endif
+
+
+// MACRO-DEFINITIONS NECESSAIRES A LA CONVERSION EN BOOLEEN ========================================
+#if !defined( _bool )
+#   define _bool(COND) isProbe(_bool ## _ ## COND)
+#   define _bool_0 a , 0
+#   define _bool_  a , 0
+#   define  isProbe(...) _second(__VA_ARGS__ , 1)
+#   define _second(a, b, ...) b
+
+#   define _not(a)   inline_if(a)(    0   )(    1   )
+#   define _and(a,b) inline_if(a)(_bool(b))(    0   )
+#   define  _or(a,b) inline_if(a)(    1   )(_bool(b))
+#   define _xor(a,b) inline_if(a)( _not(b))(    b   )
+#endif
+
+
+// MACRO-DEFINITIONS PERMETTANT LA DEFINITION DU IF-ELSE ===========================================
+#if !defined( inline_if )
+#   define inline_if(...) iif(_bool(__VA_ARGS__))
+#   define iif(COND) conct(__iif_, COND)
+#   define __iif_1(...) __VA_ARGS__ _elif_1
+#   define __iif_0(...)             _elif_0
+#   define _elif_1(...)
+#   define _elif_0(...) __VA_ARGS__
+#endif
+
+// MACRO-DEFINITIONS PERMETTANT LE FOREACH =========================================================
+#if !defined( foreach )
+#   define foreach(var,list,cond) \
+        for var in [var for var in list if cond]
+#endif
+
+
+
+// MACRO-DEFINITIONS PERMETTANT LA DEFINITION D'UNE BOUCLE FOREACH =================================
+#if !defined(for_each)
+#   define  for_each(...) _getOverride(__VA_ARGS__, _for3, _for2)(__VA_ARGS__)
+#   define _getOverride(_1, _2, _3, NAME, ...) NAME
+#   define __for() fora
+#   define _for2(data, expr) data(expr)
+#   define _for3(imin, imax, expr) EVAL(fora(imin, sub(imax,imin), expr))
+#   define  fora(indx, nmbr, expr) /*(*/                                                            \
+        expr(indx)                                                                                  \
+        inline_if ( nmbr ) (                                                                        \
+            defer2 (__for) () (inc(indx), dec(nmbr), expr)                                          \
+        )()                                                                                         \
+    /*)*/
+#endif
+
+
+// MACRO PERMETTANT DE VERIFIER Q'UNE FONCTION A DES ARGUMENTS =====================================
+#if !defined(has_args)
+#   define  has_args(...) _tmp(_first(_eof __VA_ARGS__)(0))
+#   define _first(a, ...) a
+#   define _eof(...) _tmp(_first(__VA_ARGS__))
+#   define _tmp(...) _bool(__VA_ARGS__)
+#endif
+
+
+// MACRO PERMETTANT D'ALLER CHERCHER UN ELEMENT DANS UNE LISTE =====================================
+#if !defined(get_data)
+#   define  get_data(data, indx) tt(indx, data(lst))
+#   define  tt(...) EVAL(got(__VA_ARGS__))
+#   define  lst(a) a,
+#   define _got() got
+#   define  got(indx, valr, ...) (                                                                  \
+        inline_if ( indx ) (                                                                        \
+            defer2 (_got) () (dec(indx), __VA_ARGS__ )                                              \
+        ) /*else*/ (                                                                                \
+            valr                                                                                    \
+        )                                                                                           \
+    )
+#endif
+
+
+// MACRO-DEFINITIONS DE DEREFERENCE ET D'EVALUATION ================================================
+#if !defined(defer)
+#   define _null() 
+#   define  defer(...)  __VA_ARGS__ _null()
+#   define  defer2(...) __VA_ARGS__ defer(_null) ()
+#endif
+
+
+// MACRO-DEFINITIONS PERMETTANT DE CALCULER UNE SOUSTRACTION =======================================
+#if !defined(sub)
+#   define  sub(a, b) EVAL(dif(a, b))
+#   define _dif() dif
+#   define  dif(NUM1, NUM2) /*(*/                                                                   \
+        inline_if ( NUM2 ) (                                                                        \
+            defer2 (_dif) () (dec(NUM1), dec(NUM2))                                                 \
+        ) /*else*/ (                                                                                \
+            NUM1                                                                                    \
+        )                                                                                           \
+    /*)*/
+#endif
+
+
+// MACRO-DEFINITIONS PERMETTANT DE CALCULER UNE ADDITION ===========================================
+#if !defined(add)
+#   define  add(a, b) EVAL(_sum(a, b))
+#   define _add() _sum
+#   define  _sum(NUM1, NUM2) /*(*/                                                                  \
+        inline_if( NUM2 ) (                                                                         \
+            defer2 (_add) () (inc(NUM1), dec(NUM2))                                                 \
+        ) /*else*/ (                                                                                \
+            NUM1                                                                                    \
+        )                                                                                           \
+    /*)*/
+#endif
