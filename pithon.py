@@ -1,10 +1,80 @@
-import os
+import os, re
 
 def compile_and_run(code) :
     if not code.startswith("//@pi-ignore") :
-        file_i = "to_execute.pi"
-        file_o = file_i.replace(".pi", ".py")
-        with open("to_execute.pi", "w") as f:
+        file_o = "to_execute.py"
+        w      = 'a-zA-Z0-9_'
+        
+        code = (
+            'from minlib import *\n'   +
+            'from math   import *\n'   +
+            '#include "macroDef.mac"\n'+
+            code
+        )
+        
+        code = re.sub(r"\( *(.*) *\? *(.*) *: *(.*) *\)", r"(\2 if \1 else \3)", code)
+        code = ( code
+            .replace("Α" , "Alpha"       ).replace("Β" , "Beta"      ).replace("Γ" , "Gamma"   ).replace("Δ", "Delta"    )
+            .replace("Ε" , "Epsilon"     ).replace("Ζ" , "Zeta"      ).replace("Η" , "Eta"     ).replace("Θ", "Theta"    )
+            .replace("Ι" , "Iota"        ).replace("Κ" , "Kappa"     ).replace("Λ" , "Lambda"  ).replace("Μ", "Mu"       )
+            .replace("Ν" , "Nu"          ).replace("Ξ" , "Ksi"       ).replace("Ο" , "Omicron" ).replace("Π", "Pi"       )
+            .replace("Ρ" , "Rho"         ).replace("Σ" , "Sigma"     ).replace("Τ" , "Tau"     ).replace("Υ", "Upsilon"  )
+            .replace("Φ" , "Phi"         ).replace("Χ" , "Chi"       ).replace("Ψ" , "Psi"     ).replace("Ω", "Omega"    )
+                
+            .replace("α" , "alpha"       ).replace("β" , "beta"      ).replace("γ" , "gamma"   ).replace("δ", "delta"    )
+            .replace("ε" , "epsilon"     ).replace("ζ" , "zeta"      ).replace("η" , "eta"     ).replace("θ", "theta"    )
+            .replace("ι" , "iota"        ).replace("κ" , "kappa"     ).replace("λ" , "lambda"  ).replace("μ", "mu"       )
+            .replace("ν" , "nu"          ).replace("ξ" , "ksi"       ).replace("ο" , "omicron" ).replace("π", "pi"       )
+            .replace("ρ" , "rho"         ).replace("σ" , "sigma"     ).replace("ς" , "varsigma").replace("τ", "tau"      )
+            .replace("υ" , "upsilon"     ).replace("φ" , "phi"       ).replace("ϕ" , "varphi"  ).replace("χ", "chi"      )
+            .replace("ψ" , "psi"         ).replace("ω" , "omega"     )
+                
+            .replace("∞" , "float('inf')").replace("√" , "sqrt"      )
+                
+            .replace("≤" , "<="          ).replace("≥" , ">="        ).replace("≠" , "!="      ).replace("∈", "in"       )
+            .replace("∉" , "not in"      ).replace("||", " or "      ).replace("&&", " and "   ).replace("~", " not "    )
+            .replace("++", "+=1"         ).replace("--", "-=1"       ).replace("∀" , " for "   ).replace("|", " if "     )
+            .replace("·" , "<<dot()>>"   ).replace("⌊" , "int(floor(").replace("⌋" , "))"      ).replace("⌈", "int(ceil(")
+            .replace("⌉" , "))"          )
+                
+            .replace("₀" , "⟨0⟩"         ).replace("₁" , "⟨1⟩"       ).replace("₂" , "⟨2⟩"     ).replace("₃", "⟨3⟩"      )
+            .replace("₄" , "⟨4⟩"         ).replace("₅" , "⟨5⟩"       ).replace("₆" , "⟨6⟩"     ).replace("₇", "⟨7⟩"      )
+            .replace("₈" , "⟨8⟩"         ).replace("₉" , "⟨9⟩"       ).replace("₊" , "+"       ).replace("₋", "-"        )
+            .replace("ₐ" , "⟨a⟩"         ).replace("ₑ" , "⟨e⟩"       ).replace("ₒ" , "⟨o⟩"     ).replace("ₓ", "⟨x⟩"      )
+            .replace("ₕ" , "⟨h⟩"         ).replace("ₖ" , "⟨k⟩"       ).replace("ₗ" , "⟨l⟩"     ).replace("ₘ", "⟨m⟩"      )
+            .replace("ₙ" , "⟨n⟩"         ).replace("ₚ" , "⟨p⟩"       ).replace("ₛ" , "⟨s⟩"     ).replace("ₜ", "⟨t⟩"      )
+                
+            .replace("⁰" , "**0"         ).replace("¹" , "**1"       ).replace("²" , "**2"     ).replace("³", "**3"      )
+            .replace("⁴" , "**4"         ).replace("⁵" , "**5"       ).replace("⁶" , "**6"     ).replace("⁷", "**7"      )
+            .replace("⁸" , "**8"         ).replace("⁹" , "**9"       ).replace("ⁱ" , "**i"     )
+        )
+        
+        # f ≡ x → ...   => def f(x) : return ...
+        code = re.sub(r"([{}]*) ≡ ([{}]*) *→".format(w,w), r"def \1(\2) : return ", code)
+        # f = x → ...   =>  f = lambda x : ...
+        code = re.sub(r"([{}]*) *→".format(w), r"lambda \1 : ", code)
+        
+        # from x1 to x2  => range(x1, x2+1)
+        code = re.sub(r"from *([{}]*) *to *([{}]*) *:".format(w,w), r"in range(\1,\2+1) :", code)
+        
+        # repeat ... until cond => while True: ... if cond: break
+        code = code.replace("repeat", "while True")
+        code = re.sub(r"until *(.*)".format(w), r"    if(\1):break", code)
+        
+        # select ... case/default
+        code = re.sub(r"( *)select *(.*):", r"\1__select_var__ = \2\n\1if False: pass", code)
+        code = code.replace("    case", "elif __select_var__ ==").replace("    default", "else")
+        
+        # [x1 .. x2[  =>  range(x1, x2)
+        code = re.sub(r"\[ *([{}]*) *.. *([{}]*) *\[".format(w,w), r"range(\1,\2)", code)
+        # ]x1 .. x2[  =>  range(x1+1, x2)
+        code = re.sub(r"\] *([{}]*) *.. *([{}]*) *\[".format(w,w), r"range(\1+1,\2)", code)
+        # [x1 .. x2]  =>  range(x1, x2+1)
+        code = re.sub(r"\[ *([{}]*) *.. *([{}]*) *\]".format(w,w), r"range(\1,\2+1)", code)
+        # ]x1 .. x2]  =>  range(x1+1, x2+1)
+        code = re.sub(r"\] *([{}]*) *.. *([{}]*) *\]".format(w,w), r"range(\1+1,\2+1)", code)
+        
+        with open(file_o, "w") as f:
             f.write(code)
 
         LIMT = 10000
@@ -13,81 +83,23 @@ def compile_and_run(code) :
                 f.write('#define dec_%d %d\n#define inc_%d %d\n' % (i+1, i, i, i+1))
             f.write('#define dec_0 %d\n#define inc_%d 0\n' % (LIMT, LIMT))
             f.write('#define dec(x) dec_ ## x\n#define inc(x) inc_ ## x')
-        os.system("python3 ./convert.py {}".format(file_i))
 
-        w='a-zA-Z0-9_';
-
-        os.system('cp "{}" "{}"'.format(file_i, file_o + ".tmp"))
-        os.system("sed -i '1ifrom minlib import *' '{}'".format(file_o+".tmp"));
-        os.system("sed -i '1i#include \"macroDef.mac\"' '{}'".format(file_o+".tmp"))
-        os.system("sed -i -e \"s/( *\\(.*\\) * ? *\\(.*\\) *: *\\(.*\\) *)/(\\2 if \\1 else \\3)/g\" \"{}\"".format(file_o + ".tmp"))
-
-        os.system(
-          """sed -e 's/\\xe2\\x88\\x9a/sqrt/g' -e 's/\\xe2\\x88\\x87/nabla/g;s/\\xe2\\x88\\x80/for/g' \
-            -e 's/\\xe2\\x88\\x88/in/g;s/\\xe2\\x88\\x89/not in/g;s/\\xc2\\xb7/<<dot()>>/g' \
-            -e 's/\\xe2\\x89\\xa4/<=/g;s/\\xe2\\x89\\xa5/>=/g;s/\\xe2\\x89\\xa0/!=/g' \
-            -e 's/\\xe2\\x8c\\x8a/int(floor(/g;s/[\\xe2\\x8c\\x8b\\xe2\\x8c\\x89]/))/g;s/\\xe2\\x8c\\x88/int(ceil(/g' \
-            -e 's/\\xe2\\x82\\x80/\\xe2\\x9f\\xa80\\xe2\\x9f\\xa9/g;s/\\xe2\\x82\\x81/\\xe2\\x9f\\xa81\\xe2\\x9f\\xa9/g' \
-            -e 's/\\xe2\\x82\\x82/\\xe2\\x9f\\xa82\\xe2\\x9f\\xa9/g;s/\\xe2\\x82\\x83/\\xe2\\x9f\\xa83\\xe2\\x9f\\xa9/g' \
-            -e 's/\\xe2\\x82\\x84/\\xe2\\x9f\\xa84\\xe2\\x9f\\xa9/g;s/\\xe2\\x82\\x85/\\xe2\\x9f\\xa85\\xe2\\x9f\\xa9/g' \
-            -e 's/\\xe2\\x82\\x86/\\xe2\\x9f\\xa86\\xe2\\x9f\\xa9/g;s/\\xe2\\x82\\x87/\\xe2\\x9f\\xa87\\xe2\\x9f\\xa9/g' \
-            -e 's/\\xe2\\x82\\x88/\\xe2\\x9f\\xa88\\xe2\\x9f\\xa9/g;s/\\xe2\\x82\\x89/\\xe2\\x9f\\xa89\\xe2\\x9f\\xa9/g' \
-            -e 's/\\xe2\\x82\\x98/\\xe2\\x9f\\xa8m\\xe2\\x9f\\xa9/g' \
-            -e 's/\\xe2\\x82\\x99/\\xe2\\x9f\\xa8n\\xe2\\x9f\\xa9/g;s/\\xe2\\x82\\x8a/+/g;s/\\xe2\\x82\\x8b/-/g' \
-            -e 's/\\xe2\\x81\\xb0/**0/g;s/\\xc2\\xb9/**1/g;s/\\xc2\\xb2/**2/g;s/\\xc2\\xb3/**3/g' \
-            -e 's/\\xe2\\x81\\xb4/**4/g;s/\\xe2\\x81\\xb5/**5/g;s/\\xe2\\x81\\xb6/**6/g;s/\\xe2\\x81\\xb7/**7/g' \
-            -e 's/\\xe2\\x81\\xb8/**8/g;s/\\xe2\\x81\\xb9/**9/g;s/\\xe2\\x81\\xba//g;s/\\xe2\\x81\\xbb/**-/g' \
-            -e 's/\\xe2\\x81\\xb1/**i/g' \
-            -e 's/\\xce\\xb1/alpha/g;s/\\xce\\xb2/beta/g;s/\\xce\\xb3/gamma/g;s/\\xce\\xb4/delta/g' \
-            -e 's/\\xce\\xb5/epsilon/g;s/\\xce\\xb6/zeta/g;s/\\xce\\xb7/eta/g;s/\\xce\\xb8/theta/g' \
-            -e 's/\\xce\\xb9/iota/g;s/\\xce\\xba/kappa/g;s/\\xce\\xbb/lambda/g;s/\\xce\\xbc/mu/g;s/\\xce\\xbd/nu/g' \
-            -e 's/\\xce\\xbe/ksi/g;s/\\xce\\xbf/omicron/g;s/\\xcf\\x80/pi/g;s/\\xcf\\x81/rho/g' \
-            -e 's/\\xcf\\x82/varsigma/g;s/\\xcf\\x83/sigma/g;s/\\xcf\\x84/tau/g;s/\\xcf\\x85/upsilon/g' \
-            -e 's/\\xcf\\x86/phi/g;s/\\xcf\\x95/varphi/g;s/\\xcf\\x87/chi/g;s/\\xcf\\x88/psi/g;s/\\xcf\\x89/omega/g' \
-            -e 's/\\xe2\\x88\\x9e/float(\"inf\")/g' \
-            -e 's/||/ or /g;s/&&/ and /g;s/~/ not /g;s/++/+=1/g;s/--/-=1/g' \
-            -e 's/|/ if /g' \
-            \"{}\" > \"{}\""""
-            .format(file_o+".tmp", file_o)
-        )
-
-        ## f = x → ...   =>  f = lambda x : ...
-        os.system("sed -i -e 's/\\([{}]*\\) *\\xe2\\x86\\x92/lambda \\1 : /g' \"{}\"".format(w, file_o))
-
-        ## from x1 to x2  => range(x1, x2+1)
-        os.system("sed -i -e 's/from *\\([{}]*\\) *to *\\([{}]*\\) *:/in range(\\1,\\2+1) :/g' \"{}\"".format(w, w, file_o))
-
-        ## repeat ... until cond => while True: ... if cond: break
-        os.system("sed -i -e 's/repeat/while True/g' \"{}\"".format(file_o))
-        os.system("sed -i -e 's/until\\(.*\\)/    if(\\1) :break/g' \"{}\"".format(file_o))
-
-        os.system("sed -i -e 's/\\( *\\)select *\\(.*\\):/\\1__select_var__ = \\2\\n\\1if False: pass/g' \"{}\"".format(file_o))
-        os.system("sed -i -e 's/    case/elif __select_var__ ==/g' \"{}\"".format(file_o))
-        os.system("sed -i -e 's/    default/else/g' \"{}\"".format(file_o))
-
+        # Lancement du preproc g++ et nettoyage
         os.system("cpp '{}' > '{}'".format(file_o, file_o+".tmp"))
-
-        os.system("sed '/^#/ d' \"{}\" > \"{}\" && rm \"{}\"".format(file_o+".tmp", file_o, file_o+".tmp"))
-
-        ## [x1 .. x2[  =>  range(x1, x2)
-        os.system("sed -i -e 's/\\[ *\\([{}]*\\) *.. *\\([{}]*\\) *\\[/range(\\1,\\2)/g' \"{}\"".format(w, w, file_o))
-        ## ]x1 .. x2[  =>  range(x1+1, x2)
-        os.system("sed -i -e 's/\\] *\\([{}]*\\) *.. *\\([{}]*\\) *\\[/range(\\1+1,\\2)/g' \"{}\"".format(w, w, file_o))
-        ## [x1 .. x2]  =>  range(x1, x2+1)
-        os.system("sed -i -e 's/\\[ *\\([{}]*\\) *.. *\\([{}]*\\) *\\]/range(\\1,\\2+1)/g' \"{}\"".format(w, w, file_o))
-        ## ]x1 .. x2]  =>  range(x1+1, x2+1)
-        os.system("sed -i -e 's/\\] *\\([{}]*\\) *.. *\\([{}]*\\) *\\]/range(\\1+1,\\2+1)/g' \"{}\"".format(w, w, file_o))
+        os.system("sed '/^#/ d' \"{}\" > \"{}\"".format(file_o+".tmp", file_o))
+        os.remove(file_o+".tmp")
 
         os.system("sed -i 's/#.*$//;/^$/d' \"{}\"".format(file_o))
         os.system("sed -i 's/; *$//g' \"{}\"".format(file_o))
         os.system("sed -i 's/\\xe2\\x9f\\xa9\\([+-]\\)\\xe2\\x9f\\xa8/\\1/g' \"{}\"".format(file_o))
         os.system("sed -i 's/\\xe2\\x9f\\xa9\\([+-]\\)\\xe2\\x9f\\xa8/\\1/g' \"{}\"".format(file_o))
         os.system("sed -i 's/\\xe2\\x9f\\xa9/]/g;s/\\xe2\\x9f\\xa8/[/g' \"{}\"".format(file_o))
+        os.system("sed -i 's/\\*\\*\\(.*\\)\\*\\*/\\**1/g' \"{}\"".format(file_o))
 
-        os.system("rm numbered.mac")
-        os.system("rm \"{}\"".format(file_i))
+        os.remove("numbered.mac")
 
         os.system("python3 \"{}\" > output.txt".format(file_o))
+        #os.remove(file_o)
     else :
         with open("to_execute.py", "w") as f:
             f.write(code.replace("//@", "#"))
